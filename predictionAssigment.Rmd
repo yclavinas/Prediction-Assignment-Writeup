@@ -1,0 +1,117 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Yuri Lavinas"
+date: "1/30/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require("plyr")
+require("caret")
+require("corrplot")
+require("randomForest")
+setwd(dir = "~/Documents/estudos/coursera/praticalML/")
+```
+
+# Overview
+
+This document is the final report of the Peer Assessment project from Coursera's course Practical Machine Learning, as part of the Specialization in Data Science. The main goal of the project is to predict the manner in which 6 participants performed some exercise as described below. This is the *classe* variable in the training set. The machine learning algorithm described here is applied to the 20 test cases available in the test data and the results are analysed accordingly.
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: [http://groupware.les.inf.puc-rio.br/har]http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Data Loading and Exploratory Analysis
+
+The training data for this project are available here:
+
+[Training Set]https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+[Test Set]https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Preprocessing Data
+```{r, cache=TRUE}
+
+# getting traning and testing data
+if (!file.exists("data/traning.csv")){
+  url.traning <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  download.file(url.traning, destfile = "data/traning.csv")
+}
+if (file.exists("data/traning.csv")){
+  training <- read.csv("data/traning.csv")
+}
+
+if (!file.exists("data/testing.csv")) {
+  url.testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  download.file(url.testing, destfile = "data/testing.csv")
+}
+if (file.exists("data/traning.csv")){
+  testingFile <- read.csv("data/testing.csv")
+}
+```
+
+## Checking data
+
+```{r,cache=TRUE}
+str(training)
+```
+
+Making the *classe* variable factor.
+
+```{r,cache=TRUE}
+training$classe <- as.factor(training$classe)
+```
+
+Then it is important to remove the near zero variance variables or columns that contain N/A missing values and to remove identification only variables (columns 1 to 5). Also we divide it into training and testing data.
+
+```{r, cache=TRUE}
+training <- training[,-nearZeroVar(training)]
+training <- training[,-c(1,2,3,4,5)]
+inTrain <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+training <- training[inTrain,]
+testing <- training[-inTrain,]
+```
+
+# Models
+
+Three popular methods will be applied to model the regressions using data pre processed with PCA (in the Train dataset) and the best one (with higher accuracy when applied to the Test dataset) will be used. 
+
+The methods are: Generalized Boosted Mode, Random Forests, Decision Tree and  K-Nearest Neighbour (KNN) as described below. A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
+
+## PCA
+
+```{r, cache=TRUE}
+preObj <- preProcess(training[,-length(training)],method=c("center", "scale", "knnImpute", "pca"), thresh=0.9)
+cleanData <- predict(preObj, training[,-length(training)])
+test <- predict(preObj, testing[,-length(testing)])
+```
+
+## Generalized Boosted Mode, Random Forests and  K-Nearest Neighbour (KNN) 
+
+```{r, cache=TRUE}
+set.seed(301)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+results_gbm_pca = train(training$classe ~., data=cleanData, method="gbm", trControl = controlGBM, verbose = FALSE)
+cm_gbm <- confusionMatrix(testing$classe, predict(results_gbm_pca,test))
+set.seed(301)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+results_rf_pca = train(training$classe ~., data=cleanData, method="rf",  trControl = controlRF,verbose = FALSE)
+cm_rf <- confusionMatrix(testing$classe, predict(results_rf_pca,test))
+set.seed(301)
+results_knn_pca <- train(training$classe ~.,data=cleanData, method="knn")
+cm_knn <- confusionMatrix(testing$classe, predict(results_knn_pca,test))
+```
+
+#The accuracy of the 3 regression modeling methods above are:
+
+Random Forest : `r cm_rf$accuracy` KNN : `r cm_knn$accuracy` GBM : `r cm_gbm$accuracy` In that case, the Random Forest model will be applied to predict the 20 quiz results (testing dataset) as shown below.
+
+```{r}
+
+testingFile <- testingFile[,names(testingFile) %in% names(training)]
+test <- predict(preObj, testingFile[,names(testingFile) %in% names(training)])
+predict_result <- predict(results_knn_pca,test)
+
+```
