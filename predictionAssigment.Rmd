@@ -78,7 +78,7 @@ testing <- training[-inTrain,]
 
 Three popular methods will be applied to model the regressions using data pre processed with PCA (in the Train dataset) and the best one (with higher accuracy when applied to the Test dataset) will be used. 
 
-The methods are: Generalized Boosted Mode, Random Forests, Decision Tree and  K-Nearest Neighbour (KNN) as described below. A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
+The methods are: Generalized Boosted Mode, and Random Forests as described below. A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
 
 ## PCA
 
@@ -88,30 +88,40 @@ cleanData <- predict(preObj, training[,-length(training)])
 test <- predict(preObj, testing[,-length(testing)])
 ```
 
-## Generalized Boosted Mode, Random Forests and  K-Nearest Neighbour (KNN) 
+## Generalized Boosted Mode, Random Forests 
 
 ```{r, cache=TRUE}
-set.seed(301)
-controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+set.seed(3012)
+controlGBM <- trainControl(method = "cv", number = 10)
 results_gbm_pca = train(training$classe ~., data=cleanData, method="gbm", trControl = controlGBM, verbose = FALSE)
 cm_gbm <- confusionMatrix(testing$classe, predict(results_gbm_pca,test))
-set.seed(301)
-controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+cm_gbm
+set.seed(3012)
+controlRF <- trainControl(method="cv", number=10)
 results_rf_pca = train(training$classe ~., data=cleanData, method="rf",  trControl = controlRF,verbose = FALSE)
 cm_rf <- confusionMatrix(testing$classe, predict(results_rf_pca,test))
-set.seed(301)
-results_knn_pca <- train(training$classe ~.,data=cleanData, method="knn")
-cm_knn <- confusionMatrix(testing$classe, predict(results_knn_pca,test))
+cm_rf
 ```
 
-#The accuracy of the 3 regression modeling methods above are:
+### The estimated out of sample error of the models
 
-Random Forest : `r cm_rf$accuracy` KNN : `r cm_knn$accuracy` GBM : `r cm_gbm$accuracy` In that case, the Random Forest model will be applied to predict the 20 quiz results (testing dataset) as shown below.
+```{r}
+error_gbm <- 1 - as.numeric(cm_gbm$overall[1])
+error_gbm
+error_rf <- 1 - as.numeric(cm_rf$overall[1])
+error_rf
+```
+
+# Accuracy of the models
+
+Random Forest : `r cm_rf$overall[1]` and GBM : `r cm_gbm$overall[1]` In that case, the Random Forest model will be applied to predict the 20 quiz results (testing dataset) as shown below.
+
+# Quiz
 
 ```{r}
 
 testingFile <- testingFile[,names(testingFile) %in% names(training)]
 test <- predict(preObj, testingFile[,names(testingFile) %in% names(training)])
-predict_result <- predict(results_knn_pca,test)
-
+predict_result <- predict(results_rf_pca,test)
+predict_result
 ```

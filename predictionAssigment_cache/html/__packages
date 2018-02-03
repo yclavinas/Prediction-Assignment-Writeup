@@ -5,3 +5,5 @@ ggplot2
 caret
 corrplot
 randomForest
+survival
+gbm
